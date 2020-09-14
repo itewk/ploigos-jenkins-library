@@ -104,7 +104,7 @@ def call(
           container('maven') {
             sh """
               source tssc/bin/activate
-              python -m tssc --config cicd/tssc-config.yml --step generate-metadata --environment ${environment}
+              python -m tssc --config cicd/tssc-config.yml --step generate-metadata
             """
           } // container
         } // steps
@@ -116,7 +116,7 @@ def call(
             withCredentials([usernamePassword(credentialsId: "${gitCredentialsId}", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
               sh """
                 source tssc/bin/activate
-                python -m tssc --config cicd/tssc-config.yml --step tag-source --step-config password=${GIT_PASSWORD} username=${GIT_USERNAME} --environment ${environment}
+                python -m tssc --config cicd/tssc-config.yml --step tag-source --step-config password=${GIT_PASSWORD} username=${GIT_USERNAME}
                 """
             } // withCredentials
           } // container
@@ -128,7 +128,7 @@ def call(
           container('maven') {
             sh """
               source tssc/bin/activate
-              python -m tssc --config cicd/tssc-config.yml --step unit-test --environment ${environment}
+              python -m tssc --config cicd/tssc-config.yml --step unit-test
             """
           } // container
         } // steps
@@ -139,7 +139,7 @@ def call(
           container('maven') {
             sh """
               source tssc/bin/activate
-              python -m tssc --config cicd/tssc-config.yml --step package --environment ${environment}
+              python -m tssc --config cicd/tssc-config.yml --step package
             """
           } // container
         } // steps
@@ -151,7 +151,7 @@ def call(
             withCredentials([usernamePassword(credentialsId: "${sonarqubeCredentialsId}", passwordVariable: 'SONAR_PASSWORD', usernameVariable: 'SONAR_USER')]) {
               sh """
                 source tssc/bin/activate
-                python -m tssc --config cicd/tssc-config.yml --step static-code-analysis --step-config password=${SONAR_PASSWORD} user=${SONAR_USER} --environment ${environment}
+                python -m tssc --config cicd/tssc-config.yml --step static-code-analysis --step-config password=${SONAR_PASSWORD} user=${SONAR_USER}
               """
             } // withCredentials
           } // container
@@ -164,7 +164,7 @@ def call(
             withCredentials([usernamePassword(credentialsId: "${artifactRepoCredentialsId}", passwordVariable: 'ARTIFACTORY_PASSWORD', usernameVariable: 'ARTIFACTORY_USERNAME')]) {
               sh """
                 source tssc/bin/activate
-                python -m tssc --config cicd/tssc-config.yml --step push-artifacts --step-config password=${ARTIFACTORY_PASSWORD} user=${ARTIFACTORY_USERNAME} --environment ${environment}
+                python -m tssc --config cicd/tssc-config.yml --step push-artifacts --step-config password=${ARTIFACTORY_PASSWORD} user=${ARTIFACTORY_USERNAME}
                 """
             } // withCredentials
           } // container
@@ -176,7 +176,7 @@ def call(
           container('buildah') {
             sh """
               source tssc/bin/activate
-              python -m tssc --config cicd/tssc-config.yml --step create-container-image --environment ${environment}
+              python -m tssc --config cicd/tssc-config.yml --step create-container-image
             """
 
             } // container
@@ -188,7 +188,7 @@ def call(
           container('skopeo') {
             sh """
               source tssc/bin/activate
-              python -m tssc --config cicd/tssc-config.yml --step push-container-image --environment ${environment}
+              python -m tssc --config cicd/tssc-config.yml --step push-container-image
             """
             } // container
         } // steps
@@ -196,7 +196,7 @@ def call(
 
       stage('Image Unit Testing (TBD)') {
         steps {
-          echo '${STAGE_NAME}'
+          echo "${STAGE_NAME}"
         } // steps
       } // stage
 
@@ -208,7 +208,7 @@ def call(
               container('openscap') {
                 sh """
                    source tssc/bin/activate
-                   python -m tssc --config cicd/tssc-config.yml --step container-image-static-compliance-scan --environment ${environment}
+                   python -m tssc --config cicd/tssc-config.yml --step container-image-static-compliance-scan
                    """
               } //container
             } // steps
@@ -216,7 +216,7 @@ def call(
 
         stage('Static Vulnerability Image Scan (OpenSCAP)') {
           steps {
-            echo '${STAGE_NAME}'
+            echo "${STAGE_NAME}"
           } // steps
         } // stage
         } // parallel
@@ -224,48 +224,203 @@ def call(
 
       stage('Push Trusted Container Image with Metadata') {
         steps {
-          echo '${STAGE_NAME}'
+          echo "${STAGE_NAME}"
         } // steps
       } // stage
 
-      stage('Deploy') {
-        steps {
-          container('argocd') {
-            withCredentials([usernamePassword(credentialsId: "${gitCredentialsId}", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            usernamePassword(credentialsId: "${argocdCredentialsId}", passwordVariable: 'ARGOCD_PASSWORD', usernameVariable: 'ARGOCD_USERNAME')
-            ]) {
-              sh """
-                source tssc/bin/activate
-                python -m tssc --config cicd/tssc-config.yml --step deploy --step-config git-password=${GIT_PASSWORD} git-username=${GIT_USERNAME} argocd-password=${ARGOCD_PASSWORD} argocd-username=${ARGOCD_USERNAME} --environment ${environment}
-                """
-            } // withCredentials
-          } // container
-        } // steps
-      } // stage
+      stage('DEV') {
+          when {
+              anyOf {
+                  branch 'feature/*';
+              }
+          }
+        stages {
+          stage('Deploy or Update MR#-DEV Environment') {
+            steps {
+              container('argocd') {
+                withCredentials([usernamePassword(credentialsId: "${gitCredentialsId}", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                usernamePassword(credentialsId: "${argocdCredentialsId}", passwordVariable: 'ARGOCD_PASSWORD', usernameVariable: 'ARGOCD_USERNAME')
+                ]) {
+                  sh """
+                    source tssc/bin/activate
+                    python -m tssc --config cicd/tssc-config.yml --step deploy --step-config git-password=${GIT_PASSWORD} git-username=${GIT_USERNAME} argocd-password=${ARGOCD_PASSWORD} argocd-username=${ARGOCD_USERNAME} --environment DEV
+                    """
+                } // withCredentials
+              } // container
+            } // steps
+          } // stage
 
-      stage('Validate Configuration Environment') {
-        steps {
-          container('config-lint') {
-              sh """
-                source tssc/bin/activate
-                python -m tssc --config cicd/tssc-config.yml --step validate-environment-configuration --environment ${environment}
-                """
-          } // container
-        } // steps
-      } // stage
+          stage('Validate MR#-DEV Environment Configuration') {
+            steps {
+              container('config-lint') {
+                  sh """
+                    source tssc/bin/activate
+                    python -m tssc --config cicd/tssc-config.yml --step validate-environment-configuration --environment DEV
+                    """
+              } // container
+            } // steps
+          } // stage
 
-      stage('Run User Acceptance Tests (Maven)') {
-        steps {
-          container('maven') {
-            sh """
-              source tssc/bin/activate
-              python -m tssc --config cicd/tssc-config.yml --step uat --environment ${environment}
-            """
-          } // container
-        } // steps
-      } // stage
+          stage('UAT and Vulnerability Scans') {
+            parallel {
+              stage('Run User Acceptance Tests (Maven)') {
+                steps {
+                  container('maven') {
+                    sh """
+                      source tssc/bin/activate
+                      python -m tssc --config cicd/tssc-config.yml --step uat --environment DEV
+                    """
+                  } // container
+                } // steps
+              } // stage
 
-    } //stages
+              stage('Run Runtime Vulnerability Scans') {
+                steps {
+                  echo "${STAGE_NAME}"
+                } // steps
+              } // stage
+            } // parallel
+          } // UAT and Vuln Stage
+
+          stage('Run Performance Tests (Limited)') {
+            steps {
+              echo "${STAGE_NAME}"
+            } // steps
+          } // stage
+
+        } // DEV Stages
+
+      } // Dev Stage
+
+      stage('TEST') {
+          when {
+              anyOf {
+                  branch 'master';
+                  branch 'main';
+                  branch 'hotfix/*';
+              }
+          }
+        stages {
+          stage('Deploy or Update TEST Environment') {
+            steps {
+              container('argocd') {
+                withCredentials([usernamePassword(credentialsId: "${gitCredentialsId}", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                usernamePassword(credentialsId: "${argocdCredentialsId}", passwordVariable: 'ARGOCD_PASSWORD', usernameVariable: 'ARGOCD_USERNAME')
+                ]) {
+                  sh """
+                    source tssc/bin/activate
+                    python -m tssc --config cicd/tssc-config.yml --step deploy --step-config git-password=${GIT_PASSWORD} git-username=${GIT_USERNAME} argocd-password=${ARGOCD_PASSWORD} argocd-username=${ARGOCD_USERNAME} --environment TEST
+                    """
+                } // withCredentials
+              } // container
+            } // steps
+          } // stage
+
+          stage('Validate TEST Environment Configuration') {
+            steps {
+              container('config-lint') {
+                  sh """
+                    source tssc/bin/activate
+                    python -m tssc --config cicd/tssc-config.yml --step validate-environment-configuration --environment TEST
+                    """
+              } // container
+            } // steps
+          } // stage
+
+          stage('UAT and Vulnerability Scans') {
+            parallel {
+              stage('Run User Acceptance Tests (Maven)') {
+                steps {
+                  container('maven') {
+                    sh """
+                      source tssc/bin/activate
+                      python -m tssc --config cicd/tssc-config.yml --step uat --environment TEST
+                    """
+                  } // container
+                } // steps
+              } // stage
+
+              stage('Run Runtime Vulnerability Scans') {
+                steps {
+                  echo "${STAGE_NAME}"
+                } // steps
+              } // stage
+            } // parallel
+          } // UAT and Vuln Stage
+
+          stage('Run Performance Tests (Limited)') {
+            steps {
+              echo "${STAGE_NAME}"
+            } // steps
+          } // stage
+
+        } // TEST Stages
+
+      }// TEST Stage
+
+      stage('PROD') {
+          when {
+              anyOf {
+                  branch 'master';
+                  branch 'main';
+              }
+          }
+        stages {
+          stage('Deploy or Update PROD Environment') {
+            steps {
+              container('argocd') {
+                withCredentials([usernamePassword(credentialsId: "${gitCredentialsId}", passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                usernamePassword(credentialsId: "${argocdCredentialsId}", passwordVariable: 'ARGOCD_PASSWORD', usernameVariable: 'ARGOCD_USERNAME')
+                ]) {
+                  sh """
+                    source tssc/bin/activate
+                    python -m tssc --config cicd/tssc-config.yml --step deploy --step-config git-password=${GIT_PASSWORD} git-username=${GIT_USERNAME} argocd-password=${ARGOCD_PASSWORD} argocd-username=${ARGOCD_USERNAME} --environment PROD
+                    """
+                } // withCredentials
+              } // container
+            } // steps
+          } // stage
+
+          stage('Validate PROD Environment Configuration') {
+            steps {
+              container('config-lint') {
+                  sh """
+                    source tssc/bin/activate
+                    python -m tssc --config cicd/tssc-config.yml --step validate-environment-configuration --environment PROD
+                    """
+              } // container
+            } // steps
+          } // stage
+
+          stage('Run Canary Testing') {
+            steps {
+              echo "${STAGE_NAME}"
+            } // steps
+          } // stage
+
+        } // PROD Stages
+
+      } // PROD Stage
+
+      stage('Finish') {
+          when {
+              anyOf {
+                  branch 'master';
+                  branch 'main';
+                  branch 'hotfix/*';
+              }
+          }
+        stages {
+          stage('Collect, Bundle, & Publish Test Reports and Metadata') {
+            steps {
+               archiveArtifacts artifacts: 'tssc-working/**', onlyIfSuccessful: true
+            } // steps
+          }
+
+        }// stages
+      } // Finish Stage
+
+    } // stages
 
   } // pipeline
 
