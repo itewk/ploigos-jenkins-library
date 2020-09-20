@@ -51,6 +51,9 @@ def call(Map inputMap) {
     }
 
     pipeline {
+        options {
+            ansiColor('xterm')
+        }
         agent {
             kubernetes {
                 label "${GIT_REPO_NAME}-${GIT_BRANCH}-${env.BUILD_ID}"
