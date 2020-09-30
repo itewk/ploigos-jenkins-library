@@ -381,6 +381,7 @@ def call(Map inputMap) {
                             stage('Static Vulnerability Image Scan (Not Implemented)') {
                                 steps {
                                     echo "Not Implemented"
+                                    input message: 'continue?'
                                 } // steps
                             } // stage
                         } // parallel
