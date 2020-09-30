@@ -381,7 +381,6 @@ def call(Map inputMap) {
                             stage('Static Vulnerability Image Scan (Not Implemented)') {
                                 steps {
                                     echo "Not Implemented"
-                                    input message: 'continue?'
                                 } // steps
                             } // stage
                         } // parallel
@@ -400,7 +399,8 @@ def call(Map inputMap) {
                     } // stage
                     stage('Sign Trusted Container Image') {
                         steps {
-                            container('buildah') {
+                            input message: 'continue?'
+                            container('skopeo') {
                                 sh """
                                     source tssc/bin/activate
                                     python -m tssc \
@@ -408,6 +408,7 @@ def call(Map inputMap) {
                                         --step sign-container-image
                                 """
                             } // container
+                            input message: 'continue?'
                         } // steps
                     } // stage
                 } // CI Stage
