@@ -400,7 +400,7 @@ def call(Map inputMap) {
                     stage('Sign Trusted Container Image') {
                         steps {
                             input message: 'continue?'
-                            container('skopeo') {
+                            container('buildah') {
                                 sh """
                                     source tssc/bin/activate
                                     python -m tssc \
