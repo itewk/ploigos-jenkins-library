@@ -398,6 +398,18 @@ def call(Map inputMap) {
                             } // container
                         } // steps
                     } // stage
+                    stage('Sign Trusted Container Image') {
+                        steps {
+                            container('buildah') {
+                                sh """
+                                    source tssc/bin/activate
+                                    python -m tssc \
+                                        --config ${input.configDir} \
+                                        --step sign-container-image
+                                """
+                            } // container
+                        } // steps
+                    } // stage
                 } // CI Stage
             } // CI Stages
 
