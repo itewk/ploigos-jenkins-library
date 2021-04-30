@@ -799,6 +799,11 @@ def call(Map paramsMap) {
                             }
                         }
                     }
+                    stage('TEMP PAUSE') {
+                        steps {
+                            input "continue?"
+                        }
+                    }
                 }
             } // DEV Stage
 
