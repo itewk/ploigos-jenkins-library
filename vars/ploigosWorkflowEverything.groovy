@@ -701,6 +701,7 @@ def call(Map paramsMap) {
                     stage('CI: Sign Container Image') {
                         steps {
                             container("${WORKFLOW_WORKER_NAME_CONTAINER_OPERATIONS}") {
+                                input "continue?"
                                 sh """
                                     if [ "${params.verbose}" == "true" ]; then set -x; else set +x; fi
                                     set -eu -o pipefail
